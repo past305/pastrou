@@ -1,1 +1,610 @@
 
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <!-- منع التكبير (Zoom) نهائياً عند النقر المزدوج -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>الروليت العشوائي</title>
+    <style>
+        /* المتغيرات والتنسيقات الأساسية */
+        :root {
+            --bg-dark: #050914;
+            --primary: #0ea5e9;
+            --primary-glow: rgba(14, 165, 233, 0.5);
+            --glass-bg: rgba(15, 23, 42, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            /* منع تحديد النص لتجربة أكثر سلاسة */
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* منع التحريك الجانبي والسماح بالحركة للأعلى والأسفل فقط */
+            overflow-x: hidden;
+            overflow-y: auto;
+            touch-action: pan-y;
+            position: relative;
+            padding: 20px 0;
+        }
+
+        /* الخلفية الهندسية واللمسات الجمالية */
+        .bg-mesh {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            background-image: 
+                radial-gradient(circle at 20% 40%, rgba(14, 165, 233, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 80% 60%, rgba(99, 102, 241, 0.12) 0%, transparent 40%);
+        }
+
+        .bg-mesh::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-size: 50px 50px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+            -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+            transform: perspective(600px) rotateX(20deg);
+            animation: pulseGrid 10s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulseGrid {
+            0% { transform: perspective(600px) rotateX(20deg) translateY(0); opacity: 0.8; }
+            100% { transform: perspective(600px) rotateX(20deg) translateY(20px); opacity: 1; }
+        }
+
+        /* الحاويات الزجاجية (Glassmorphism) */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(14, 165, 233, 0.05);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            margin: auto;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.95);
+            position: absolute;
+            display: none; /* لمنع تأثيرها على مساحة السكرول */
+        }
+
+        .active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+            position: relative;
+            display: block;
+        }
+
+        /* تنسيقات صفحة الإعدادات */
+        .title {
+            text-align: center;
+            font-size: 1.6rem;
+            margin-bottom: 25px;
+            font-weight: 700;
+            text-shadow: 0 0 20px var(--primary-glow);
+            letter-spacing: 1px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 15px;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            /* استثناء حقل النص للسماح بالتحديد والكتابة */
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+        }
+
+        button {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.3s;
+            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(2, 132, 199, 0.6);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: #334155;
+            box-shadow: none;
+            cursor: not-allowed;
+            color: #94a3b8;
+        }
+
+        .names-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 25px;
+            max-height: 180px;
+            overflow-y: auto;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+        }
+
+        .name-tag {
+            background: rgba(14, 165, 233, 0.2);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            padding: 6px 12px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .name-tag span { cursor: pointer; color: #f87171; font-weight: bold; padding: 2px; }
+        .name-tag span:hover { color: #ef4444; }
+
+        .btn-full { width: 100%; margin-top: 10px; }
+        .btn-outline { background: transparent; border: 1px solid var(--primary); box-shadow: none; margin-top: 10px; }
+        .btn-outline:hover { background: rgba(14, 165, 233, 0.1); }
+
+        /* تنسيقات عجلة الروليت (محسّنة للأحجام) */
+        .wheel-container {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            max-width: 100%;
+            margin: 20px auto 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .wheel-ring {
+            position: absolute;
+            top: -12px; left: -12px; right: -12px; bottom: -12px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 0 30px rgba(14, 165, 233, 0.2), inset 0 0 20px rgba(0,0,0,0.5);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        canvas {
+            border-radius: 50%;
+            transform-origin: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.6);
+            width: 100%;
+            height: 100%;
+            /* مؤشر اليد للسماح بالضغط */
+            cursor: pointer;
+            touch-action: none; /* لمنع الشاشة من التحرك عند لمس العجلة */
+        }
+
+        /* المؤشر */
+        .pointer {
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0; 
+            height: 0; 
+            border-top: 15px solid transparent;
+            border-bottom: 15px solid transparent;
+            border-right: 25px solid #fff;
+            z-index: 15;
+            filter: drop-shadow(-3px 0px 5px rgba(0,0,0,0.5));
+        }
+
+        .pointer::after {
+            content: '';
+            position: absolute;
+            right: -23px;
+            top: -10px;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-right: 20px solid var(--primary);
+            z-index: 16;
+        }
+
+        /* نافذة الفائز الناتئة */
+        .winner-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s;
+        }
+
+        .winner-modal.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .winner-content {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 40px 60px;
+            border-radius: 20px;
+            text-align: center;
+            transform: scale(0.8);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 0 50px rgba(14, 165, 233, 0.3);
+            max-width: 90%;
+        }
+
+        .winner-modal.show .winner-content {
+            transform: scale(1);
+        }
+
+        .winner-title { font-size: 1.1rem; color: #cbd5e1; margin-bottom: 10px; }
+        .winner-name { font-size: 2.5rem; font-weight: 900; color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.5); word-wrap: break-word;}
+        .close-modal { margin-top: 25px; }
+        
+        /* تحسين السكرول */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(14, 165, 233, 0.5); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-mesh"></div>
+
+    <!-- صفحة 1: إعداد الأسماء -->
+    <div id="page1" class="glass-panel active">
+        <div class="title">إعداد الروليت</div>
+        <div class="input-group">
+            <input type="text" id="nameInput" placeholder="أدخل الاسم هنا..." onkeypress="handleKeyPress(event)">
+            <button onclick="addName()">إضافة</button>
+        </div>
+        <div id="namesContainer" class="names-list"></div>
+        <button id="goToWheelBtn" class="btn-full" onclick="switchPage('page2')" disabled>الانتقال إلى الروليت</button>
+    </div>
+
+    <!-- صفحة 2: عجلة الروليت -->
+    <div id="page2" class="glass-panel hidden">
+        <div class="title">السحب العشوائي</div>
+        <div class="wheel-container">
+            <div class="wheel-ring"></div>
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" width="350" height="350"></canvas>
+        </div>
+        <button id="spinBtn" class="btn-full" onclick="spinWheel()">ابدأ السحب!</button>
+        <button class="btn-full btn-outline" onclick="switchPage('page1')">رجوع وتعديل الأسماء</button>
+    </div>
+
+    <!-- نافذة إعلان الفائز -->
+    <div id="winnerModal" class="winner-modal">
+        <div class="winner-content">
+            <div class="winner-title">الفائز هو</div>
+            <div id="winnerText" class="winner-name">---</div>
+            <button class="close-modal" onclick="closeModal()">حسناً</button>
+        </div>
+    </div>
+
+    <script>
+        // المتغيرات الأساسية
+        let names = [];
+        let currentRotation = 0; 
+        let isSpinning = false;
+        let cheatedIndex = -1; // متغير لحفظ الخدعة السرية
+        
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const nameInput = document.getElementById('nameInput');
+        const namesContainer = document.getElementById('namesContainer');
+        const goToWheelBtn = document.getElementById('goToWheelBtn');
+        const spinBtn = document.getElementById('spinBtn');
+
+        const colors = ['#0ea5e9', '#1e40af', '#4f46e5', '#0284c7', '#3b82f6', '#0369a1'];
+
+        // --- نظام الصوت (Web Audio API) ---
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playTone(freq, type, duration, vol = 0.05) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playSpinningSound() {
+            let delay = 50;
+            let elapsed = 0;
+            function tick() {
+                if (!isSpinning) return;
+                playTone(700, 'triangle', 0.05, 0.03);
+                elapsed += delay;
+                delay *= 1.06; // تباطؤ الصوت ليتزامن مع تباطؤ العجلة
+                if (elapsed < 6000) {
+                    setTimeout(tick, delay);
+                }
+            }
+            tick();
+        }
+
+        function playWinSound() {
+            playTone(440, 'sine', 0.3, 0.1);
+            setTimeout(() => playTone(554, 'sine', 0.3, 0.1), 150);
+            setTimeout(() => playTone(659, 'sine', 0.6, 0.1), 300);
+        }
+
+        function playCheatConfirmSound() {
+            // صوت خفيف جداً لتأكيد تفعيل الخدعة
+            playTone(880, 'sine', 0.1, 0.01);
+            setTimeout(() => playTone(1760, 'sine', 0.1, 0.01), 100);
+        }
+
+        // --- وظائف الصفحة الأولى ---
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') addName();
+        }
+
+        function addName() {
+            initAudio(); // تفعيل الصوت
+            const val = nameInput.value.trim();
+            if (val && !names.includes(val)) {
+                names.push(val);
+                updateNamesList();
+                nameInput.value = '';
+                checkStartReady();
+                drawWheel(); 
+            }
+        }
+
+        function removeName(index) {
+            names.splice(index, 1);
+            updateNamesList();
+            checkStartReady();
+            drawWheel();
+            cheatedIndex = -1; // إلغاء الخدعة لو تغيرت الأسماء
+        }
+
+        function updateNamesList() {
+            namesContainer.innerHTML = '';
+            names.forEach((name, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'name-tag';
+                tag.innerHTML = `${name} <span onclick="removeName(${index})">✖</span>`;
+                namesContainer.appendChild(tag);
+            });
+        }
+
+        function checkStartReady() {
+            goToWheelBtn.disabled = names.length < 2;
+        }
+
+        function switchPage(pageId) {
+            if (isSpinning) return;
+            initAudio();
+            document.getElementById('page1').className = 'glass-panel hidden';
+            document.getElementById('page2').className = 'glass-panel hidden';
+            document.getElementById(pageId).className = 'glass-panel active';
+            cheatedIndex = -1; // إعادة تعيين الخدعة عند تبديل الصفحات
+        }
+
+        // --- الخدعة السرية (النقر المزدوج على العجلة) ---
+        let lastTapTime = 0;
+        canvas.addEventListener('pointerdown', (e) => {
+            if (isSpinning || names.length < 2) return;
+            initAudio();
+            
+            const currentTime = new Date().getTime();
+            const tapDuration = currentTime - lastTapTime;
+            
+            if (tapDuration < 400 && tapDuration > 0) {
+                // تفعيل الخدعة عند النقر المزدوج
+                calculateCheat(e);
+                e.preventDefault();
+            }
+            lastTapTime = currentTime;
+        });
+
+        function calculateCheat(e) {
+            const rect = canvas.getBoundingClientRect();
+            // حساب المركز في الشاشة
+            const centerX = rect.left + (rect.width / 2);
+            const centerY = rect.top + (rect.height / 2);
+            
+            const x = e.clientX - centerX;
+            const y = e.clientY - centerY;
+            
+            // حساب الزاوية بناءً على موضع النقر
+            let clickAngle = Math.atan2(y, x) * (180 / Math.PI);
+            if (clickAngle < 0) clickAngle += 360;
+            
+            // تعويض الدوران الحالي للعجلة
+            let adjustedAngle = (clickAngle - (currentRotation % 360)) % 360;
+            if (adjustedAngle < 0) adjustedAngle += 360;
+            
+            // معرفة أي شريحة تم النقر عليها
+            const sliceAngleDeg = 360 / names.length;
+            cheatedIndex = Math.floor(adjustedAngle / sliceAngleDeg);
+            
+            // إصدار صوت تأكيدي خفي
+            playCheatConfirmSound();
+        }
+
+        // --- وظائف العجلة والسحب ---
+        function drawWheel() {
+            if (names.length === 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                return;
+            }
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = centerX;
+            const sliceAngle = (2 * Math.PI) / names.length;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < names.length; i++) {
+                const startAngle = i * sliceAngle;
+                const endAngle = (i + 1) * sliceAngle;
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#050914';
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(startAngle + (sliceAngle / 2));
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px "Segoe UI"';
+                ctx.fillText(names[i], radius - 25, 6);
+                ctx.restore();
+            }
+        }
+
+        function spinWheel() {
+            if (isSpinning || names.length < 2) return;
+            isSpinning = true;
+            spinBtn.disabled = true;
+            initAudio();
+
+            const minSpins = 6;
+            const randomSpins = Math.floor(Math.random() * 4) + minSpins; 
+            let targetRemainder;
+
+            // تطبيق الخدعة إذا تم تفعيلها، أو سحب عشوائي حقيقي
+            if (cheatedIndex !== -1) {
+                const sliceAngleDeg = 360 / names.length;
+                // حساب الزاوية المطلوبة لوقوف المؤشر بمنتصف الشريحة المخادعة
+                const targetPointerAngle = (cheatedIndex * sliceAngleDeg) + (sliceAngleDeg / 2);
+                targetRemainder = (360 - targetPointerAngle) % 360;
+                cheatedIndex = -1; // تصفير الخدعة للاستخدام مرة واحدة
+            } else {
+                targetRemainder = Math.floor(Math.random() * 360);
+            }
+
+            // حساب الدرجات اللازمة للوصول للزاوية المطلوبة بدون رجوع عكسي
+            const currentRemainder = currentRotation % 360;
+            let degreesToMove = targetRemainder - currentRemainder;
+            if (degreesToMove < 0) degreesToMove += 360; 
+            
+            degreesToMove += (randomSpins * 360);
+            currentRotation += degreesToMove;
+
+            // بدء الدوران
+            canvas.style.transition = 'transform 6s cubic-bezier(0.15, 0.85, 0.15, 1)';
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+            
+            // تشغيل صوت الدوران
+            playSpinningSound();
+
+            setTimeout(() => {
+                isSpinning = false;
+                spinBtn.disabled = false;
+                calculateWinner();
+                playWinSound();
+            }, 6000);
+        }
+
+        function calculateWinner() {
+            const normalizedRotation = currentRotation % 360;
+            const pointerAngle = (360 - normalizedRotation) % 360;
+            const sliceAngleDeg = 360 / names.length;
+            
+            const winningIndex = Math.floor(pointerAngle / sliceAngleDeg);
+            const winner = names[winningIndex];
+
+            document.getElementById('winnerText').textContent = winner;
+            document.getElementById('winnerModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('winnerModal').classList.remove('show');
+        }
+
+        drawWheel();
+    </script>
+</body>
+</html>
